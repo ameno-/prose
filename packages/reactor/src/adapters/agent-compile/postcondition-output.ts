@@ -81,9 +81,9 @@ export function flatPredicateNodeSchema(): z.ZodTypeAny {
       value: z.number(),
     }),
     z.object({ kind: z.literal("less-than"), fact: z.string(), value: z.number() }),
-    z.object({ kind: z.literal("and"), children: z.array(z.number().int()) }),
-    z.object({ kind: z.literal("or"), children: z.array(z.number().int()) }),
-    z.object({ kind: z.literal("not"), child: z.number().int() }),
+    z.object({ kind: z.literal("and"), children: z.array(z.number().int().describe("0-based index references to other nodes in the sibling nodes array")) }),
+    z.object({ kind: z.literal("or"), children: z.array(z.number().int().describe("0-based index references to other nodes in the sibling nodes array")) }),
+    z.object({ kind: z.literal("not"), child: z.number().int().describe("0-based index reference to the target node in the sibling nodes array") }),
   ]);
 }
 
@@ -97,9 +97,9 @@ export function flatPredicateNodeSchema(): z.ZodTypeAny {
 export function flatPredicateSchema(): z.ZodTypeAny {
   return z.object({
     /** The flat node pool; connectives index into it. */
-    nodes: z.array(flatPredicateNodeSchema()),
+    nodes: z.array(flatPredicateNodeSchema()).describe("The flat node list of the predicate tree"),
     /** Index (into `nodes`) of the predicate's root node. */
-    root: z.number().int(),
+    root: z.number().int().describe("The 0-based index of the root node in the nodes array (e.g. 0 if there is only one node)"),
   });
 }
 

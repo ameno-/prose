@@ -334,6 +334,11 @@ test("Defect A: the postcondition output schema lowers to a JSON Schema with NO 
   ok(!json.includes("$defs"), "model-facing schema must carry no $defs");
 });
 
+test("Defect A: the flat predicate schema properties contain descriptions enforcing 0-based indexing", () => {
+  const json = lowerToJsonSchemaString(postconditionOutputSchema());
+  ok(json.includes("0-based index"), "should describe root and child index referencing rules for LLM guidance");
+});
+
 test("Defect A: the flat predicate sub-schema is itself $ref-free", () => {
   const json = lowerToJsonSchemaString(z.object({ predicate: flatPredicateSchema() }));
   ok(!json.includes("$ref"));
@@ -408,6 +413,36 @@ test("Defect A: a flat nested predicate gates the commit exactly as the recursiv
   const fail = gateCommit(set, { confidence: 0.2, sourced: true, verified: false });
   equal(fail.status, "failed");
   equal(fail.failures[0]?.id, "well-grounded");
+});
+
+test("decodeFlatPredicate: reproducing 1-based indexing drift failure (the broken behavior)", () => {
+  // Case A: Single node. LLM output root: 1 (1-based index) instead of root: 0.
+  const flatSingle = {
+    nodes: [
+      { kind: "equals" as const, fact: "status", value: "success" }
+    ],
+    root: 1, // Drifted to 1-based root index (out of range for length 1)
+  };
+  throws(
+    () => decodeFlatPredicate(flatSingle),
+    /flat predicate index 1 is out of range/,
+    "1-based root index must throw index out of range error"
+  );
+
+  // Case B: Compound nodes. LLM output children: [2, 3] (1-based index) instead of children: [1, 2].
+  const flatCompound = {
+    nodes: [
+      { kind: "and" as const, children: [2, 3] }, // Drifted to 1-based indices (2 refers to second element, 3 refers to out-of-range third element)
+      { kind: "equals" as const, fact: "status", value: "success" },
+      { kind: "greater-than-or-equal" as const, fact: "confidence", value: 0.5 },
+    ],
+    root: 0,
+  };
+  throws(
+    () => decodeFlatPredicate(flatCompound),
+    /flat predicate index 3 is out of range/,
+    "1-based child index must throw index out of range error"
+  );
 });
 
 test("decodeFlatPredicate: rejects an out-of-range child index (never a silent IR)", () => {
